@@ -89,19 +89,34 @@ namespace Nepraetor
             }
 
             int pointCount = DeterminePointCount(viewCounts);
-            bool isDummy = IsDummyData(pointCount, 1368, viewCounts);
+            
+            // Get OCR'd numbers and validate across sections
+            var rawReferenceNumbers = new Dictionary<string, int>
+            {
+                ["Overhead"] = ExtractReferenceNumber(img, 0, "overhead", frameNumber),
+                ["Side"] = ExtractReferenceNumber(img, 1, "side", frameNumber),
+                ["Back"] = ExtractReferenceNumber(img, 2, "back", frameNumber)
+            };
+
+            // Find the most common reference number (majority wins)
+            int validReferenceNumber = GetMostCommonValue(rawReferenceNumbers.Values);
+
+            // Use the validated reference number for all sections
+            var referenceNumbers = new Dictionary<string, int>
+            {
+                ["Overhead"] = validReferenceNumber,
+                ["Side"] = validReferenceNumber,
+                ["Back"] = validReferenceNumber
+            };
+
+            bool isDummy = IsDummyData(pointCount, validReferenceNumber, viewCounts);
 
             return new ViewResult
             {
                 FrameNumber = frameNumber,
                 Points = pointCount,
                 IsDummy = isDummy,
-                ViewReferenceCounts = new Dictionary<string, int>
-                {
-                    ["Overhead"] = ExtractReferenceNumber(img, 0, "overhead", frameNumber),
-                    ["Side"] = ExtractReferenceNumber(img, 1, "side", frameNumber),
-                    ["Back"] = ExtractReferenceNumber(img, 2, "back", frameNumber)
-                }
+                ViewReferenceCounts = referenceNumbers
             };
         }
 
@@ -203,21 +218,37 @@ namespace Nepraetor
             
             var sectionMat = new Mat(img, new OCVRect(0, section * sectionHeight, img.Width, sectionHeight));
             
-            // Extract bottom-left region where ×1368 appears
-            var bottomLeft = new Mat(sectionMat, new OCVRect(0, sectionHeight - 25, 60, 25));
+            // Adjust the region to better capture the reference number (×1368)
+            var bottomLeft = new Mat(sectionMat, new OCVRect(5, sectionHeight - 20, 50, 15));
             
-            // Prepare image for OCR
+            // Prepare image for OCR with better preprocessing
             using var gray = bottomLeft.CvtColor(ColorConversionCodes.BGR2GRAY);
-            using var binary = gray.Threshold(128, 255, ThresholdTypes.Binary);
             
-            // Scale up for better OCR
-            using var scaled = new Mat();
-            Cv2.Resize(binary, scaled, new Size(binary.Width * 2, binary.Height * 2), 0, 0, InterpolationFlags.Cubic);
+            // Invert the image since text is white on black
+            using var inverted = new Mat();
+            Cv2.BitwiseNot(gray, inverted);
             
-            SaveDebugImage(scaled, frameNumber, $"6_reference_number_{sectionName}");
+            // Use adaptive thresholding for better text extraction
+            using var binary = new Mat();
+            Cv2.AdaptiveThreshold(inverted, binary, 255,
+                AdaptiveThresholdTypes.GaussianC,
+                ThresholdTypes.Binary,
+                11, // Block size
+                2   // C constant
+            );
 
-            // Convert OpenCV Mat to Bitmap then to Pix for Tesseract
-            using var bitmap = OpenCvSharp.Extensions.BitmapConverter.ToBitmap(scaled);
+            // Scale up significantly for better OCR
+            using var scaled = new Mat();
+            Cv2.Resize(binary, scaled, new Size(binary.Width * 4, binary.Height * 4), 0, 0, InterpolationFlags.Cubic);
+            
+            // Optional: Add border to help OCR
+            using var withBorder = new Mat();
+            Cv2.CopyMakeBorder(scaled, withBorder, 10, 10, 10, 10, BorderTypes.Constant, Scalar.White);
+            
+            SaveDebugImage(withBorder, frameNumber, $"6_reference_number_{sectionName}");
+
+            // Convert to Pix for Tesseract
+            using var bitmap = OpenCvSharp.Extensions.BitmapConverter.ToBitmap(withBorder);
             using var pix = Pix.LoadFromMemory(ImageToByte(bitmap));
             using (var page = tesseract.Process(pix))
             {
@@ -233,9 +264,19 @@ namespace Nepraetor
                         return number;
                     }
                 }
+                else
+                {
+                    // Try to find just the number if × is not detected
+                    var numbers = System.Text.RegularExpressions.Regex.Match(text, @"\d+");
+                    if (numbers.Success && int.TryParse(numbers.Value, out int number))
+                    {
+                        return number;
+                    }
+                }
             }
             
-            return 1368;  // Default if OCR fails
+            Debug.WriteLine($"OCR failed for section {sectionName}");
+            return 0;
         }
 
         private byte[] ImageToByte(System.Drawing.Bitmap bitmap)
@@ -295,6 +336,49 @@ namespace Nepraetor
             double difference = Math.Abs(pointCount - referenceCount) / (double)referenceCount;
             
             return difference > tolerance;
+        }
+
+        private int GetMostCommonValue(IEnumerable<int> values)
+        {
+            var validValues = values.Where(x => x > 0).ToList();
+            if (!validValues.Any())
+                return 0;
+
+            // Convert numbers to strings with leading zeros to align digits
+            int maxLength = validValues.Max(x => x.ToString().Length);
+            var paddedNumbers = validValues.Select(x => x.ToString().PadLeft(maxLength, '0')).ToList();
+
+            // Build result digit by digit
+            var resultDigits = new List<char>();
+            
+            // Process each digit position from right to left
+            for (int pos = maxLength - 1; pos >= 0; pos--)
+            {
+                var digitsAtPosition = paddedNumbers
+                    .Where(n => pos < n.Length)  // Only consider numbers long enough
+                    .Select(n => n[pos])
+                    .Where(c => c != '0' || resultDigits.Any())  // Ignore leading zeros unless we have digits
+                    .ToList();
+
+                if (!digitsAtPosition.Any())
+                    continue;
+
+                // Get most common digit at this position
+                var mostCommonDigit = digitsAtPosition
+                    .GroupBy(d => d)
+                    .OrderByDescending(g => g.Count())
+                    .ThenBy(g => g.Key)  // If tie, take smaller digit
+                    .First()
+                    .Key;
+
+                resultDigits.Insert(0, mostCommonDigit);
+            }
+
+            // Convert back to number
+            if (!resultDigits.Any())
+                return 0;
+
+            return int.Parse(new string(resultDigits.ToArray()));
         }
 
         public void Dispose()
