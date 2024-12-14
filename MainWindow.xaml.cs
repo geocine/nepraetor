@@ -1,4 +1,4 @@
-﻿using System.Windows;
+﻿﻿using System.Windows;
 using NHotkey;
 using NHotkey.Wpf;
 using System.Drawing;

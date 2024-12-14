@@ -94,6 +94,8 @@ namespace Nepraetor
                 OverlayWindow.Instance.Close();
             }
 
+            // Create new overlay window at exact selection coordinates
+            // No need to adjust for margin since OverlayWindow constructor handles that
             var overlayWindow = new OverlayWindow(x, y, width, height);
             overlayWindow.Show();
         }

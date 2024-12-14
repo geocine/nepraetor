@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Controls;
 using System.Windows.Shapes;
 using System.Windows.Controls.Primitives;
+using System.Diagnostics;
 
 namespace Nepraetor
 {
@@ -23,15 +24,28 @@ namespace Nepraetor
         {
             InitializeComponent();
             
-            // Account for the margin in position and size
-            this.Left = x - 12;
-            this.Top = y - 12;
-            this.Width = width + 24;  // 12 pixels margin on each side
-            this.Height = height + 24;
+            // Set explicit window properties to ensure consistent behavior
+            this.WindowStyle = WindowStyle.None;
+            this.ResizeMode = ResizeMode.NoResize;
+            this.AllowsTransparency = true;
+            this.Background = null;
             
-            this.MouseLeftButtonDown += OnMouseLeftButtonDown;
-            this.MouseLeftButtonUp += OnMouseLeftButtonUp;
-            this.MouseMove += OnMouseMove;
+            // Adjust for the 7-pixel offset in both directions
+            const int WINDOW_OFFSET = 7;
+            
+            // Position the window with offset correction
+            this.Left = x - WINDOW_OFFSET;
+            this.Top = y - WINDOW_OFFSET;
+            this.Width = width;
+            this.Height = height;
+            
+            Debug.WriteLine($"Requested Position: ({x}, {y}), Size: {width}x{height}");
+            Debug.WriteLine($"Actual Window - Position: ({this.Left}, {this.Top}), Size: {this.Width}x{this.Height}");
+            
+            // Set up drag handle events
+            DragHandle.PreviewMouseLeftButtonDown += OnDragHandleMouseDown;
+            DragHandle.PreviewMouseLeftButtonUp += OnDragHandleMouseUp;
+            DragHandle.PreviewMouseMove += OnDragHandleMouseMove;
 
             // Close any existing overlay window
             if (instance != null)
@@ -41,23 +55,22 @@ namespace Nepraetor
             instance = this;
         }
 
-        private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void OnDragHandleMouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.Source == CloseButton) return;
-            if (e.Source is Rectangle) return; // Don't start window drag if clicking resize handle
-            
             isDragging = true;
             lastPosition = e.GetPosition(this);
-            this.CaptureMouse();
+            DragHandle.CaptureMouse();
+            e.Handled = true;
         }
 
-        private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        private void OnDragHandleMouseUp(object sender, MouseButtonEventArgs e)
         {
             isDragging = false;
-            this.ReleaseMouseCapture();
+            DragHandle.ReleaseMouseCapture();
+            e.Handled = true;
         }
 
-        private void OnMouseMove(object sender, MouseEventArgs e)
+        private void OnDragHandleMouseMove(object sender, MouseEventArgs e)
         {
             if (isDragging)
             {
@@ -65,6 +78,8 @@ namespace Nepraetor
                 var offset = currentPosition - lastPosition;
                 this.Left += offset.X;
                 this.Top += offset.Y;
+                Debug.WriteLine($"Window Dragged - Position: ({this.Left}, {this.Top}), Size: {this.Width}x{this.Height}");
+                e.Handled = true;
             }
         }
 
@@ -105,22 +120,11 @@ namespace Nepraetor
 
                 switch (activeHandle.Name)
                 {
-                    case "TopLeftHandle":
-                        this.Left = originalLeft + deltaX;
-                        this.Top = originalTop + deltaY;
-                        this.Width = Math.Max(50, originalWidth - deltaX);
-                        this.Height = Math.Max(50, originalHeight - deltaY);
-                        break;
-
-                    case "TopRightHandle":
-                        this.Top = originalTop + deltaY;
-                        this.Width = Math.Max(50, originalWidth + deltaX);
-                        this.Height = Math.Max(50, originalHeight - deltaY);
-                        break;
-
                     case "BottomLeftHandle":
-                        this.Left = originalLeft + deltaX;
-                        this.Width = Math.Max(50, originalWidth - deltaX);
+                        var newWidth = Math.Max(50, originalWidth - deltaX);
+                        var widthDelta = originalWidth - newWidth;
+                        this.Left = originalLeft + widthDelta;
+                        this.Width = newWidth;
                         this.Height = Math.Max(50, originalHeight + deltaY);
                         break;
 
@@ -130,6 +134,7 @@ namespace Nepraetor
                         break;
                 }
 
+                Debug.WriteLine($"Window Resized - Position: ({this.Left}, {this.Top}), Size: {this.Width}x{this.Height}");
                 e.Handled = true;
             }
         }
@@ -150,12 +155,12 @@ namespace Nepraetor
 
         public (int x, int y, int width, int height) GetBounds()
         {
-            // Return the actual content bounds (excluding margin)
+            // Return the exact window bounds since they now match the selection
             return (
-                (int)(Left + 12), 
-                (int)(Top + 12), 
-                (int)(Width - 24), 
-                (int)(Height - 24)
+                (int)Left,
+                (int)Top,
+                (int)Width,
+                (int)Height
             );
         }
     }

@@ -1,85 +1,71 @@
 <Window x:Class="Nepraetor.OverlayWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Overlay" 
-        WindowStyle="None" 
+        Title="OverlayWindow" 
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
-        Topmost="True"
-        ResizeMode="NoResize"
-        ShowInTaskbar="False">
-    <Grid Margin="12">
-        <Border BorderBrush="#00FF00" 
-                BorderThickness="2" 
-                Background="Transparent">
+        ResizeMode="NoResize">
+    <Grid>
+        <!-- Main border that shows the selection area -->
+        <Border BorderBrush="#FF0078D4" 
+                BorderThickness="2">
+            
+            <!-- Drag handle at the top -->
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="24"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Drag handle bar -->
+                <Rectangle x:Name="DragHandle" 
+                         Fill="#330078D4" 
+                         Height="24" 
+                         VerticalAlignment="Top"
+                         Grid.Row="0"/>
+
+                <!-- Close button -->
+                <Button Click="OnCloseButtonClick"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Width="24" 
+                        Height="24"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Grid.Row="0">
+                    <Path Data="M 0,0 L 10,10 M 0,10 L 10,0"
+                          Stroke="#FF0078D4"
+                          StrokeThickness="2"
+                          Width="10"
+                          Height="10"/>
+                </Button>
+
                 <!-- Resize handles -->
-                <Rectangle x:Name="TopLeftHandle" 
-                         Width="20" Height="20" 
-                         Fill="#4000FF00" 
-                         HorizontalAlignment="Left" 
-                         VerticalAlignment="Top"
-                         Cursor="SizeNWSE"
-                         MouseLeftButtonDown="OnResizeHandleMouseDown"
-                         MouseLeftButtonUp="OnResizeHandleMouseUp"
-                         MouseMove="OnResizeHandleMouseMove"/>
-                         
-                <Rectangle x:Name="TopRightHandle" 
-                         Width="20" Height="20" 
-                         Fill="#4000FF00" 
-                         HorizontalAlignment="Right" 
-                         VerticalAlignment="Top"
-                         Cursor="SizeNESW"
-                         MouseLeftButtonDown="OnResizeHandleMouseDown"
-                         MouseLeftButtonUp="OnResizeHandleMouseUp"
-                         MouseMove="OnResizeHandleMouseMove"/>
-                         
-                <Rectangle x:Name="BottomLeftHandle" 
-                         Width="20" Height="20" 
-                         Fill="#4000FF00" 
-                         HorizontalAlignment="Left" 
+                <Rectangle x:Name="BottomLeftHandle"
+                         Fill="#FF0078D4"
+                         Width="6" Height="6"
+                         HorizontalAlignment="Left"
                          VerticalAlignment="Bottom"
-                         Cursor="SizeNESW"
-                         MouseLeftButtonDown="OnResizeHandleMouseDown"
-                         MouseLeftButtonUp="OnResizeHandleMouseUp"
-                         MouseMove="OnResizeHandleMouseMove"/>
-                         
-                <Rectangle x:Name="BottomRightHandle" 
-                         Width="20" Height="20" 
-                         Fill="#4000FF00" 
-                         HorizontalAlignment="Right" 
+                         Grid.Row="1"
+                         PreviewMouseDown="OnResizeHandleMouseDown"
+                         PreviewMouseUp="OnResizeHandleMouseUp"
+                         PreviewMouseMove="OnResizeHandleMouseMove"
+                         Cursor="SizeNESW"/>
+
+                <Rectangle x:Name="BottomRightHandle"
+                         Fill="#FF0078D4"
+                         Width="6" Height="6"
+                         HorizontalAlignment="Right"
                          VerticalAlignment="Bottom"
-                         Cursor="SizeNWSE"
-                         MouseLeftButtonDown="OnResizeHandleMouseDown"
-                         MouseLeftButtonUp="OnResizeHandleMouseUp"
-                         MouseMove="OnResizeHandleMouseMove"/>
+                         Grid.Row="1"
+                         PreviewMouseDown="OnResizeHandleMouseDown"
+                         PreviewMouseUp="OnResizeHandleMouseUp"
+                         PreviewMouseMove="OnResizeHandleMouseMove"
+                         Cursor="SizeNWSE"/>
             </Grid>
         </Border>
-        
-        <!-- Close button positioned outside the border -->
-        <Button x:Name="CloseButton" 
-                Content="×" 
-                Width="24" 
-                Height="24"
-                HorizontalAlignment="Right" 
-                VerticalAlignment="Top"
-                Margin="0,-12,-12,0"
-                Background="Red"
-                Foreground="White"
-                FontWeight="Bold"
-                FontSize="16"
-                BorderThickness="0"
-                Click="OnCloseButtonClick"
-                Panel.ZIndex="1000">
-            <Button.Template>
-                <ControlTemplate TargetType="Button">
-                    <Grid>
-                        <Ellipse Fill="{TemplateBinding Background}"/>
-                        <ContentPresenter HorizontalAlignment="Center" 
-                                        VerticalAlignment="Center"/>
-                    </Grid>
-                </ControlTemplate>
-            </Button.Template>
-        </Button>
     </Grid>
 </Window>
